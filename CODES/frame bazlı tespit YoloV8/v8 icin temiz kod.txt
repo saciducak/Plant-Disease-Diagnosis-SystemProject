@@ -1,0 +1,86 @@
+!nvidia-smi
+
+import os
+HOME = os.getcwd()
+print(HOME)
+
+# Pip install method (recommended)
+
+!pip install ultralytics==8.0.196
+
+from IPython import display
+display.clear_output()
+
+import ultralytics
+ultralytics.checks()
+
+from ultralytics import YOLO
+
+from IPython.display import display, Image
+
+model = YOLO(f'{HOME}/yolov8n.pt')
+results = model.predict(source='https://media.roboflow.com/notebooks/examples/dog.jpeg', conf=0.25)
+
+results[0].boxes.xyxy
+
+results[0].boxes.conf
+
+results[0].boxes.cls
+
+!mkdir {HOME}/datasets
+%cd {HOME}/datasets
+
+!pip install roboflow --quiet
+
+from roboflow import Roboflow
+rf = Roboflow(api_key="gGsQ42EvK9CktMAILWyO")
+project = rf.workspace("saciducak").project("domates_tespit")
+dataset = project.version(1).download("yolov8")
+
+%cd {HOME}
+
+!yolo task=detect mode=train model=yolov8s.pt data={dataset.location}/data.yaml epochs=25 imgsz=800 plots=True
+
+!ls {HOME}/runs/detect/train/
+
+%cd {HOME}
+Image(filename=f'{HOME}/runs/detect/train/confusion_matrix.png', width=600)
+
+%cd {HOME}
+Image(filename=f'{HOME}/runs/detect/train/results.png', width=600)
+
+%cd {HOME}
+Image(filename=f'{HOME}/runs/detect/train/val_batch0_pred.jpg', width=600)
+
+%cd {HOME}
+
+!yolo task=detect mode=val model={HOME}/runs/detect/train/weights/best.pt data={dataset.location}/data.yaml
+
+%cd {HOME}
+!yolo task=detect mode=predict model={HOME}/runs/detect/train/weights/best.pt conf=0.25 source={dataset.location}/test/images save=True
+
+import glob
+from IPython.display import Image, display
+
+for image_path in glob.glob(f'{HOME}/runs/detect/predict3/*.jpg')[:3]:
+      display(Image(filename=image_path, width=600))
+      print("\n")
+
+
+project.version(dataset.version).deploy(model_type="yolov8", model_path=f"{HOME}/runs/detect/train/")
+
+#Run inference on your model on a persistant, auto-scaling, cloud API
+
+#load model
+model = project.version(dataset.version).model
+
+#choose random test set image
+import os, random
+test_set_loc = dataset.location + "/test/images/"
+random_test_image = random.choice(os.listdir(test_set_loc))
+print("running inference on " + random_test_image)
+
+pred = model.predict(test_set_loc + random_test_image, confidence=40, overlap=30).json()
+pred
+
+
